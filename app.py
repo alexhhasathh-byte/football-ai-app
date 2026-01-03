@@ -8,7 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 # --- 1. محرك البيانات (Data Layer) ---
 class FootballEngine:
     def __init__(self, api_key):
-        self.api_key = api_key
+        self.api_key = st.secrets["MY_API_KEY"]
         self.headers = {'x-rapidapi-key': api_key, 'x-rapidapi-host': "v3.football.api-sports.io"}
         self.url = "https://v3.football.api-sports.io"
 
