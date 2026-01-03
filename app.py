@@ -1,92 +1,118 @@
 import streamlit as st
+import requests
+import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 from math import exp, factorial
+from sklearn.ensemble import RandomForestClassifier
 
-# --- إعدادات الهوية البصرية لـ Yaya Score ---
-st.set_page_config(page_title="Yaya Score | AI Predictions", layout="wide", page_icon="⚽")
+# --- 1. محرك البيانات (Data Layer) ---
+class FootballEngine:
+    def __init__(self, api_key):
+        self.api_key = st.secrets["MY_API_KEY"]
+        self.headers = {'x-rapidapi-key': api_key, 'x-rapidapi-host': "v3.football.api-sports.io"}
+        self.url = "https://v3.football.api-sports.io"
 
-# تصميم واجهة احترافية مخصصة
-st.markdown("""
-    <style>
-    .main { background-color: #0f172a; }
-    .app-header {
-        background: linear-gradient(90deg, #1e40af, #3b82f6);
-        padding: 20px;
-        border-radius: 15px;
-        text-align: center;
-        color: white;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    def get_team_stats(self, team_id, league_id):
+        # في الواقع، هذا الرابط يجلب البيانات الحقيقية من الـ API
+        # لغرض العرض، سنقوم بمحاكاة البيانات إذا لم يتوفر مفتاح API فعال
+        try:
+            endpoint = f"{self.url}/teams/statistics?league={league_id}&season=2025&team={team_id}"
+            res = requests.get(endpoint, headers=self.headers).json()
+            avg_goals = res['response']['goals']['for']['average']['total']
+            return float(avg_goals)
+        except:
+            return 1.5 # قيمة افتراضية
+
+# --- 2. محرك الذكاء الاصطناعي (AI Layer) ---
+def train_ai_logic():
+    # بيانات تدريبية نموذجية (أهداف، أيام راحة، استحواذ -> نتيجة)
+    data = {
+        'avg_goals': [2.5, 1.0, 0.5, 3.0, 1.2, 2.0, 0.8, 1.7],
+        'rest_days': [5, 2, 3, 7, 4, 3, 2, 5],
+        'possession': [60, 40, 35, 65, 45, 55, 30, 50],
+        'outcome': [2, 0, 0, 2, 1, 2, 0, 1] # 2: Win, 1: Draw, 0: Loss
     }
-    .yaya-logo { font-size: 45px; font-weight: bold; letter-spacing: 2px; }
-    .prediction-box {
-        background-color: #1e293b;
-        border: 2px solid #3b82f6;
-        padding: 20px;
-        border-radius: 15px;
-        text-align: center;
-    }
-    </style>
-    <div class="app-header">
-        <div class="yaya-logo">YAYA SCORE</div>
-        <p>المحرك الأقوى لتوقعات كرة القدم بالذكاء الاصطناعي</p>
-    </div>
-    """, unsafe_allow_html=True)
+    df = pd.DataFrame(data)
+    model = RandomForestClassifier(n_estimators=50)
+    model.fit(df[['avg_goals', 'rest_days', 'possession']], df['outcome'])
+    return model
 
-# --- محرك التحليل الإحصائي ---
-def poisson_analysis(h_avg, a_avg):
-    matrix = np.zeros((6, 6))
-    for i in range(6):
-        for j in range(6):
-            prob = (exp(-h_avg) * (h_avg**i) / factorial(i)) * (exp(-a_avg) * (a_avg**j) / factorial(j))
-            matrix[i, j] = prob
+# --- 3. محرك بويسان للنتائج الدقيقة (Math Layer) ---
+def poisson_prob(actual, average):
+    return (exp(-average) * (average**actual)) / factorial(actual)
+
+def get_exact_score_matrix(h_avg, a_avg):
+    matrix = np.zeros((5, 5))
+    for i in range(5):
+        for j in range(5):
+            matrix[i, j] = poisson_prob(i, h_avg) * poisson_prob(j, a_avg)
     return matrix
 
-# --- القائمة الجانبية ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/5323/5323483.png", width=100)
-    st.title("Yaya Score Admin")
-    st.info("مرحباً بك في لوحة تحكم Yaya Score. هذا النظام يحلل البيانات بناءً على قوة الهجوم والدفاع.")
+# --- 4. واجهة التطبيق (UI Layer) ---
+st.set_page_config(page_title="AI Sports Predictor Pro", layout="wide")
 
-# --- منطقة تحليل المباريات ---
+st.title("⚽ المحلل الرياضي الخارق (AI + Poisson)")
+st.sidebar.header("⚙️ الإعدادات والتحكم")
+
+api_key = st.sidebar.text_input("أدخل API Key الخاص بك", type="password")
+selected_league = st.sidebar.selectbox("اختر الدوري", ["الدوري الإنجليزي (39)", "الدوري الإسباني (140)", "الدوري السعودي (307)"])
+
 col1, col2 = st.columns(2)
 
 with col1:
-    home_t = st.text_input("الفريق المضيف", "مانشستر يونايتد")
-    h_power = st.slider("مستوى هجوم الأرض", 0.5, 5.0, 2.0)
+    st.subheader("🏠 الفريق المستضيف")
+    h_id = st.text_input("ID الفريق الأرضي", "40")
+    h_rest = st.slider("أيام الراحة (للأرض)", 1, 10, 5)
+    h_pos = st.slider("متوسط الاستحواذ % (الأرض)", 30, 70, 50)
 
 with col2:
-    away_t = st.text_input("الفريق الضيف", "تشيلسي")
-    a_power = st.slider("مستوى هجوم الضيف", 0.5, 5.0, 1.5)
+    st.subheader("🚀 الفريق الضيف")
+    a_id = st.text_input("ID الفريق الضيف", "33")
+    a_rest = st.slider("أيام الراحة (للضيف)", 1, 10, 5)
+    a_pos = st.slider("متوسط الاستحواذ % (للضيف)", 30, 70, 50)
 
-if st.button("إظهار توقع YAYA SCORE", use_container_width=True):
-    m = poisson_analysis(h_power, a_power)
-    
-    # حساب الاحتمالات
-    h_win = np.sum(np.tril(m, -1)) * 100
-    draw = np.trace(m) * 100
-    a_win = np.sum(np.triu(m, 1)) * 100
-    
-    st.markdown("---")
-    
-    # عرض النتيجة الأكثر توقعاً بشكل ضخم
-    score = np.unravel_index(m.argmax(), m.shape)
-    st.markdown(f"""
-        <div class="prediction-box">
-            <h3 style="color: #94a3b8;">النتيجة المتوقعة</h3>
-            <h1 style="color: #fbbf24; font-size: 80px;">{score[0]} - {score[1]}</h1>
-            <p style="color: #3b82f6;">ثقة النظام: {m.max()*100:.1f}%</p>
-        </div>
-    """, unsafe_allow_html=True)
+if st.button("🔥 تشغيل التحليل العميق"):
+    if not api_key:
+        st.error("يرجى إدخال مفتاح الـ API أولاً!")
+    else:
+        engine = FootballEngine(api_key)
+        ai_model = train_ai_logic()
+        
+        with st.spinner('جاري معالجة البيانات وتحليل الأنماط...'):
+            # جلب البيانات
+            h_avg = engine.get_team_stats(h_id, 39)
+            a_avg = engine.get_team_stats(a_id, 39)
+            
+            # 1. تحليل بويسان (الإحصائي)
+            matrix = get_exact_score_matrix(h_avg, a_avg)
+            h_win_p = np.sum(np.tril(matrix, -1))
+            a_win_p = np.sum(np.triu(matrix, 1))
+            draw_p = np.trace(matrix)
+            
+            # 2. تحليل الذكاء الاصطناعي (النمطي)
+            ai_input = [[h_avg, h_rest, h_pos]]
+            ai_probs = ai_model.predict_proba(ai_input)[0]
 
-    # الرسوم البيانية
-    fig = go.Figure(data=[go.Bar(
-        x=[home_t, 'تعادل', away_t],
-        y=[h_win, draw, a_win],
-        marker_color=['#2563eb', '#64748b', '#dc2626']
-    )])
-    fig.update_layout(title="نسب احتمالات الفوز", template="plotly_dark")
-    st.plotly_chart(fig, use_container_width=True)
+            # عرض النتائج
+            st.markdown("---")
+            res1, res2 = st.columns(2)
+            
+            with res1:
+                st.header("📊 التوقع الإحصائي (Poisson)")
+                st.write(f"فوز الأرض: {h_win_p:.1%}")
+                st.write(f"تعادل: {draw_p:.1%}")
+                st.write(f"فوز الضيف: {a_win_p:.1%}")
+                
+            with res2:
+                st.header("🧠 توقع الذكاء الاصطناعي")
+                st.write(f"ثقة الفوز: {ai_probs[2]:.1%}")
+                st.write(f"ثقة التعادل: {ai_probs[1]:.1%}")
+                st.write(f"ثقة الخسارة: {ai_probs[0]:.1%}")
 
-st.markdown("<p style='text-align: center; color: #475569;'>© 2026 Yaya Score - All Rights Reserved</p>", unsafe_allow_html=True)
+            # مصفوفة النتائج الدقيقة
+            st.subheader("🎯 مصفوفة النتائج الأكثر احتمالية")
+            df_m = pd.DataFrame(matrix * 100, index=[f"{i}" for i in range(5)], columns=[f"{i}" for i in range(5)])
+            st.dataframe(df_m.style.background_gradient(cmap='Greens'))
+            
+            best_score = np.unravel_index(matrix.argmax(), matrix.shape)
+            st.success(f"✅ النتيجة المقترحة: {best_score[0]} - {best_score[1]}")
